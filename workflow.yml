@@ -1,0 +1,26 @@
+name: Hourly Job Board Auto-Sync
+
+on:
+  schedule:
+    - cron: '0 * * * *'
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install Dependencies
+        run: pip install requests psycopg2-binary
+
+      - name: Run Job Collector Pipeline
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: python collector.py
