@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>India Student & Freshers Job Board</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="bg-gray-50 text-gray-900 font-sans">
+
+    <!-- Header / Hero Section -->
+    <header class="bg-indigo-600 text-white py-12 px-6 shadow-md" id="page-header">
+        <div class="max-w-6xl mx-auto text-center">
+            <h1 class="text-4xl font-extrabold mb-3">🚀 India Student & Freshers Job Board</h1>
+            <p class="text-indigo-100 text-lg mb-8">Discover verified roles posted within the last 7 days across India & Remote.</p>
+            
+            <!-- Advanced Hybrid Search & Filters Toolbar -->
+            <div class="flex flex-col md:flex-row flex-wrap gap-3 justify-center items-center" onkeydown="handleEnter(event)">
+                <input type="text" id="searchInput" placeholder="Search company, category, role, or description..." 
+                    oninput="applyFilters()"
+                    class="w-full md:w-64 px-4 py-3 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-300 shadow">
+                
+                <input type="text" id="cityInput" placeholder="Filter by city (e.g. Bangalore)..." 
+                    oninput="applyFilters()"
+                    class="w-full md:w-52 px-4 py-3 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-300 shadow">
+
+                <select id="tierFilter" onchange="applyFilters()" class="w-full md:w-48 px-4 py-3 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-300 shadow">
+                    <option value="">All Startup Tiers</option>
+                    <option value="Micro-Startup (1-10 emp)">Micro-Startup (1-10 emp)</option>
+                    <option value="New Startup (11-50 emp)">New Startup (11-50 emp)</option>
+                    <option value="Seed A Funded">Seed A Funded</option>
+                    <option value="Seed B Funded">Seed B Funded</option>
+                    <option value="Series A/B Scale-up">Series A/B Scale-up</option>
+                    <option value="MNC / Global Enterprise">MNC / Global Enterprise</option>
+                </select>
+
+                <select id="typeFilter" onchange="applyFilters()" class="w-full md:w-40 px-4 py-3 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-300 shadow">
+                    <option value="">All Job Types</option>
+                    <option value="Full-time">Full-time</option>
+                    <option value="Internship">Internship</option>
+                </select>
+
+                <!-- Defaulted strictly to Past 7 Days -->
+                <select id="dateFilter" onchange="applyFilters()" class="w-full md:w-44 px-4 py-3 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-300 shadow">
+                    <option value="7" selected>Past 7 Days Only</option>
+                    <option value="1">Past 24 Hours</option>
+                    <option value="3">Past 3 Days</option>
+                    <option value="30">Past 30 Days</option>
+                </select>
+
+                <button onclick="applyFilters()" class="w-full md:w-auto bg-white text-indigo-600 font-bold px-6 py-3 rounded-lg hover:bg-indigo-50 shadow transition cursor-pointer">
+                    Search Jobs
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Container -->
+    <main class="max-w-6xl mx-auto px-6 py-10">
+        
+        <!-- Job Board View -->
+        <div id="board-view">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold text-gray-800">Fresh Opportunities (Past 7 Days)</h2>
+                <span id="jobCount" class="text-sm font-semibold text-gray-500 bg-gray-200 px-3 py-1 rounded-full">Loading listings...</span>
+            </div>
+
+            <div id="jobContainer" class="grid grid-cols-1 md:grid-cols-2 gap-6"></div>
+
+            <div class="flex justify-between items-center mt-10 bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+                <button id="prevBtn" onclick="changePage(-1)" class="bg-gray-200 text-gray-700 font-semibold px-5 py-2 rounded-lg hover:bg-gray-300 transition disabled:opacity-50" disabled>
+                    &larr; Previous Page
+                </button>
+                <span id="pageIndicator" class="text-sm font-bold text-gray-600">Page 1</span>
+                <button id="nextBtn" onclick="changePage(1)" class="bg-indigo-600 text-white font-semibold px-5 py-2 rounded-lg hover:bg-indigo-700 transition disabled:opacity-50">
+                    Next Page &rarr;
+                </button>
+            </div>
+        </div>
+
+        <!-- Detailed Job View (Hidden by default) -->
+        <div id="detail-view" class="hidden bg-white p-8 rounded-2xl shadow-lg border border-gray-100">
+            <button onclick="backToBoard()" class="mb-6 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold px-4 py-2 rounded-lg transition flex items-center gap-2">
+                &larr; Back to Job Board
+            </button>
+            
+            <div id="detail-content"></div>
+        </div>
+
+    </main>
+
+    <!-- Frontend Script Logic -->
+    <script>
+        const supabaseClient = supabase.createClient(
+            "https://cmdbvxosqoxapgxbomlo.supabase.co", 
+            "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNtZGJ2eG9zcW94YXBneGJvbWxvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU2NTI2NzAsImV4cCI6MjEwMTIyODY3MH0.NWGOLVonmQuu4BRmV76UA9L8NKuzWdnoHkybZJc0N48"
+        );
+
+        let allJobsCache = [];
+        let filteredJobsCache = [];
+        let currentPage = 1;
+        const pageSize = 20;
+
+        async function fetchJobs() {
+            const container = document.getElementById('jobContainer');
+            container.innerHTML = `<p class="col-span-2 text-center text-gray-500 py-10">Syncing live database listings...</p>`;
+
+            const { data, error } = await supabaseClient
+                .from('jobs')
+                .select('*')
+                .order('created_at', { ascending: false });
+
+            if (error) {
+                container.innerHTML = `<p class="col-span-2 text-center text-red-500 py-10">Unable to load jobs. Please check database connection.</p>`;
+                console.error(error);
+                return;
+            }
+
+            allJobsCache = data || [];
+            applyFilters();
+        }
+
+        function handleEnter(event) {
+            if (event.key === 'Enter') {
+                applyFilters();
+            }
+        }
+
+        function cleanLocation(loc) {
+            if (!loc || loc.toLowerCase().includes("hub zone") || loc.toLowerCase().includes("undefined")) {
+                return "Pan-India / Remote";
+            }
+            return loc;
+        }
+
+        function getWorkingApplyUrl(job) {
+            let url = job.apply_url;
+            if (!url || url === "undefined" || url.includes("undefined") || url.includes("jobs.lever.co")) {
+                const query = encodeURIComponent(`${job.title} ${job.company} careers`);
+                return `https://www.google.com/search?q=${query}`;
+            }
+            return url;
+        }
+
+        function formatTimeAgo(dateString) {
+            if (!dateString) return "Recently posted";
+            const now = new Date();
+            const jobDate = new Date(dateString);
+            const diffHours = Math.floor(Math.abs(now - jobDate) / (1000 * 60 * 60));
+            const diffDays = Math.floor(diffHours / 24);
+
+            if (diffHours < 1) return "Posted just now";
+            if (diffHours < 24) return `Posted ${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+            if (diffDays === 1) return "Posted yesterday";
+            if (diffDays <= 7) return `Posted ${diffDays} days ago`;
+            return `Posted on ${jobDate.toLocaleDateString()}`;
+        }
+
+        function applyFilters() {
+            const rawSearch = document.getElementById('searchInput').value.trim().toLowerCase();
+            const cityVal = document.getElementById('cityInput').value.trim().toLowerCase();
+            const tierVal = document.getElementById('tierFilter').value;
+            const typeVal = document.getElementById('typeFilter').value;
+            const dateVal = document.getElementById('dateFilter').value; // Default is 7
+
+            const now = new Date();
+            const searchTokens = rawSearch ? rawSearch.split(/\s+/).filter(t => t.length > 0) : [];
+
+            const scoredJobs = allJobsCache.map(job => {
+                const titleText = (job.title || "").toLowerCase();
+                const compText = (job.company || "").toLowerCase();
+                const catText = (job.category || "").toLowerCase();
+                const descText = (job.description || "").toLowerCase();
+                const locText = cleanLocation(job.location).toLowerCase();
+                const typeText = (job.job_type || "").toLowerCase();
+
+                let score = 0;
+                let matchesSearch = true;
+
+                if (searchTokens.length > 0) {
+                    let matchedTokensCount = 0;
+                    searchTokens.forEach(token => {
+                        let tokenMatched = false;
+                        if (titleText.includes(token)) { score += 15; tokenMatched = true; }
+                        if (compText.includes(token)) { score += 12; tokenMatched = true; }
+                        if (catText.includes(token)) { score += 10; tokenMatched = true; }
+                        if (descText.includes(token)) { score += 5; tokenMatched = true; }
+                        if (locText.includes(token)) { score += 4; tokenMatched = true; }
+                        if (typeText.includes(token)) { score += 3; tokenMatched = true; }
+
+                        if (tokenMatched) matchedTokensCount++;
+                    });
+                    if (matchedTokensCount === 0) matchesSearch = false;
+                }
+
+                if (cityVal && !locText.includes(cityVal)) return null;
+
+                if (tierVal) {
+                    const safeTier = typeof job.startup_tier === 'object' ? JSON.stringify(job.startup_tier) : (job.startup_tier || '');
+                    if (safeTier !== tierVal) return null;
+                }
+
+                if (typeVal && !typeText.includes(typeVal.toLowerCase())) return null;
+
+                // STRICT DATE POSTED FILTER (Defaults to past 7 days)
+                if (dateVal && job.created_at) {
+                    const jobDate = new Date(job.created_at);
+                    const diffDays = Math.abs(now - jobDate) / (1000 * 60 * 60 * 24);
+                    if (diffDays > parseFloat(dateVal)) return null;
+                }
+
+                if (!matchesSearch) return null;
+
+                return { job, score };
+            }).filter(item => item !== null);
+
+            scoredJobs.sort((a, b) => b.score - a.score);
+            filteredJobsCache = scoredJobs.map(item => item.job);
+            currentPage = 1;
+            renderPagination();
+        }
+
+        function renderPagination() {
+            const countBadge = document.getElementById('jobCount');
+            countBadge.innerText = `${filteredJobsCache.length} active listings found`;
+
+            const totalPages = Math.ceil(filteredJobsCache.length / pageSize) || 1;
+            if (currentPage > totalPages) currentPage = totalPages;
+            if (currentPage < 1) currentPage = 1;
+
+            document.getElementById('pageIndicator').innerText = `Page ${currentPage} of ${totalPages}`;
+            document.getElementById('prevBtn').disabled = currentPage === 1;
+            document.getElementById('nextBtn').disabled = currentPage >= totalPages;
+
+            const startIdx = (currentPage - 1) * pageSize;
+            const paginatedData = filteredJobsCache.slice(startIdx, startIdx + pageSize);
+
+            renderJobs(paginatedData);
+        }
+
+        function changePage(direction) {
+            currentPage += direction;
+            renderPagination();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function renderJobs(jobs) {
+            const container = document.getElementById('jobContainer');
+            container.innerHTML = '';
+
+            if (!jobs || jobs.length === 0) {
+                container.innerHTML = `<p class="col-span-2 text-center text-gray-500 py-10">No recent listings found from the past 7 days. Run your collector script to fetch fresh updates!</p>`;
+                return;
+            }
+
+            jobs.forEach((job) => {
+                const displayLoc = cleanLocation(job.location);
+                const safeTier = typeof job.startup_tier === 'object' ? JSON.stringify(job.startup_tier) : (job.startup_tier || 'Startup');
+                const validApplyUrl = getWorkingApplyUrl(job);
+                const timeAgoString = formatTimeAgo(job.created_at);
+                
+                const plainDescription = (job.description || 'Exciting career opportunity for freshers and students across India.')
+                    .replace(/<[^>]*>?/gm, '')
+                    .replace(/\s+/g, ' ')
+                    .trim();
+
+                const card = document.createElement('div');
+                card.className = "bg-white p-6 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition flex flex-col justify-between cursor-pointer group";
+                
+                card.onclick = (e) => {
+                    if (e.target.tagName === 'A' || e.target.closest('a')) return;
+                    showJobDetail(job);
+                };
+
+                card.innerHTML = `
+                    <div>
+                        <div class="flex justify-between items-start mb-3">
+                            <div>
+                                <span class="text-xs font-bold text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-md uppercase tracking-wider">${job.category || 'General'}</span>
+                                <span class="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-md ml-2">${safeTier}</span>
+                            </div>
+                            <span class="text-xs font-medium text-gray-500 bg-gray-100 px-2 py-0.5 rounded">${job.job_type || 'Full-time'}</span>
+                        </div>
+                        <h3 class="text-xl font-bold text-gray-900 mb-1 group-hover:text-indigo-600 transition">${job.title}</h3>
+                        <p class="text-md font-medium text-indigo-900 mb-2">${job.company} &bull; <span class="text-gray-500 font-normal">${displayLoc}</span></p>
+                        <p class="text-xs font-semibold text-amber-700 bg-amber-50 inline-block px-2 py-0.5 rounded mb-3">⏳ ${timeAgoString}</p>
+                        <p class="text-sm text-gray-600 mb-4 line-clamp-2 overflow-hidden">${plainDescription}</p>
+                    </div>
+                    <div class="pt-4 border-t border-gray-100 flex justify-between items-center">
+                        <span class="text-xs text-indigo-500 font-medium group-hover:underline">Click for full details &rarr;</span>
+                        <a href="${validApplyUrl}" target="_blank" rel="noopener noreferrer"
+                           class="bg-indigo-600 text-white text-sm font-semibold px-4 py-2 rounded-lg hover:bg-indigo-700 transition shadow-sm">
+                            Apply Now &rarr;
+                        </a>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function showJobDetail(job) {
+            const boardView = document.getElementById('board-view');
+            const detailView = document.getElementById('detail-view');
+            const detailContent = document.getElementById('detail-content');
+            
+            boardView.classList.add('hidden');
+            detailView.classList.remove('hidden');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+
+            const displayLoc = cleanLocation(job.location);
+            const safeTier = typeof job.startup_tier === 'object' ? JSON.stringify(job.startup_tier) : (job.startup_tier || 'Startup');
+            const validApplyUrl = getWorkingApplyUrl(job);
+            const timeAgoString = formatTimeAgo(job.created_at);
+
+            detailContent.innerHTML = `
+                <div class="flex flex-wrap gap-2 mb-4 items-center">
+                    <span class="text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-md uppercase tracking-wider">${job.category || 'General'}</span>
+                    <span class="text-xs font-semibold text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-md">${safeTier}</span>
+                    <span class="text-xs font-medium text-gray-600 bg-gray-100 px-3 py-1.5 rounded-md">${job.job_type || 'Full-time'}</span>
+                    <span class="text-xs font-semibold text-amber-700 bg-amber-50 px-3 py-1.5 rounded-md">⏳ ${timeAgoString}</span>
+                </div>
+                
+                <h1 class="text-3xl font-extrabold text-gray-900 mb-2">${job.title}</h1>
+                <p class="text-lg font-medium text-indigo-900 mb-6">🏢 <strong>${job.company}</strong> &bull; <span class="text-gray-500">📍 ${displayLoc}</span></p>
+                
+                <div class="bg-indigo-50/50 border border-indigo-100 p-6 rounded-xl mb-8 flex flex-col sm:flex-row justify-between items-center gap-4">
+                    <div>
+                        <h4 class="font-bold text-gray-900 text-sm">Ready to take the next step?</h4>
+                        <p class="text-xs text-gray-600 mt-0.5">Submit your application directly through the official employer portal.</p>
+                    </div>
+                    <a href="${validApplyUrl}" target="_blank" rel="noopener noreferrer"
+                       class="bg-indigo-600 text-white font-bold px-6 py-3 rounded-xl hover:bg-indigo-700 transition shadow-md whitespace-nowrap">
+                        Apply Now &rarr;
+                    </a>
+                </div>
+
+                <h3 class="text-lg font-bold text-gray-800 mb-3">Job Description & Details</h3>
+                <div class="prose max-w-none text-gray-700 text-base leading-relaxed whitespace-pre-line bg-gray-50 p-6 rounded-xl border border-gray-100">
+                    ${job.description || 'No detailed description provided for this listing.'}
+                </div>
+
+                <div class="mt-8 pt-6 border-t border-gray-100 flex justify-between items-center">
+                    <button onclick="backToBoard()" class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold px-5 py-2 rounded-lg transition">
+                        &larr; Back to Job Board
+                    </button>
+                    <a href="${validApplyUrl}" target="_blank" rel="noopener noreferrer"
+                       class="bg-indigo-600 text-white text-sm font-semibold px-6 py-2.5 rounded-lg hover:bg-indigo-700 transition shadow-sm">
+                        Apply Now &rarr;
+                    </a>
+                </div>
+            `;
+        }
+
+        function backToBoard() {
+            document.getElementById('detail-view').classList.add('hidden');
+            document.getElementById('board-view').classList.remove('hidden');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        window.onload = fetchJobs;
+    </script>
+</body>
+</html>
